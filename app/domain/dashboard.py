@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from collections import defaultdict
 from collections.abc import Iterable
 from datetime import date, timedelta
 from typing import Any, Literal
