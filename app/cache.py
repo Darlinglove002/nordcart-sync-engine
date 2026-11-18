@@ -43,6 +43,15 @@ def _version_key(seller_id: int) -> str:
     return f"ue:ver:{seller_id}"
 
 
+def purge_all(client: redis.Redis) -> int:
+    """Drop every dashboard and auth entry. For dev tooling after a wipe; not used on hot paths."""
+    n = 0
+    for pattern in ("ue:*", "auth:*", "lock:*"):
+        for k in client.scan_iter(pattern, count=500):
+            n += client.delete(k)
+    return n
+
+
 class DashboardCache:
     def __init__(self, client: redis.Redis, ttl: int, lock_seconds: int, wait_seconds: float = 3.0):
         self.r = client

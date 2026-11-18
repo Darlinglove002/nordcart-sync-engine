@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from datetime import UTC, date, datetime
 from typing import Any
 
-from sqlalchemy import delete, func, insert, select, update
+from sqlalchemy import BigInteger, delete, func, insert, select, update
 from sqlalchemy.orm import Session
 
 from app.db.models import (
@@ -64,11 +64,14 @@ def fetch_daily_rollup(s: Session, seller_id: int, d1: date, d2: date) -> list[D
 
 
 def fetch_sku_rollup(s: Session, seller_id: int, d1: date, d2: date) -> list[SkuMetrics]:
-    cols = [DailySkuMetrics.product_id, *(getattr(DailySkuMetrics, f) for f in SKU_SUMMED_FIELDS)]
+    # Summed in SQL: ~200 rows come back instead of one row per SKU-day (10k+ per seller).
+    cols = [
+        func.sum(getattr(DailySkuMetrics, f)).cast(BigInteger).label(f) for f in SKU_SUMMED_FIELDS
+    ]
     rows = s.execute(
-        select(*cols).where(
-            DailySkuMetrics.seller_id == seller_id, DailySkuMetrics.day.between(d1, d2)
-        )
+        select(DailySkuMetrics.product_id, *cols)
+        .where(DailySkuMetrics.seller_id == seller_id, DailySkuMetrics.day.between(d1, d2))
+        .group_by(DailySkuMetrics.product_id)
     )
     return [SkuMetrics(**dict(r._mapping)) for r in rows]
 

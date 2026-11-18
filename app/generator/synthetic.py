@@ -28,11 +28,11 @@ from app.db.models import AdSpend, Product, Seller
 # category: (commission_bps, price range in cents, typical gross margin range, base logistics
 #            cents range, return probability)
 CATEGORIES: dict[str, tuple[int, tuple[int, int], tuple[float, float], tuple[int, int], float]] = {
-    "electronics": (800, (2_500, 90_000), (0.10, 0.32), (350, 900), 0.06),
-    "apparel": (1500, (1_200, 12_000), (0.35, 0.60), (250, 500), 0.18),
-    "home": (1200, (1_500, 40_000), (0.25, 0.50), (600, 1_500), 0.05),
-    "beauty": (1400, (800, 6_000), (0.40, 0.65), (200, 400), 0.04),
-    "toys": (1000, (900, 9_000), (0.30, 0.55), (300, 800), 0.07),
+    "electronics": (800, (2_500, 90_000), (0.20, 0.40), (350, 900), 0.06),
+    "apparel": (1500, (1_200, 12_000), (0.45, 0.65), (250, 500), 0.18),
+    "home": (1200, (1_500, 40_000), (0.33, 0.55), (600, 1_500), 0.05),
+    "beauty": (1400, (800, 6_000), (0.48, 0.68), (200, 400), 0.04),
+    "toys": (1000, (900, 9_000), (0.36, 0.58), (300, 800), 0.07),
 }
 SELLER_NAMES = [
     "Fjord & Co",
