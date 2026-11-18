@@ -20,7 +20,10 @@ class OrderIn(BaseModel):
     def _sane(self) -> "OrderIn":
         if self.ordered_at.tzinfo is None:
             raise ValueError("ordered_at must include a timezone offset")
-        if self.discount_cents > self.quantity * self.unit_price_cents:
+        total = self.quantity * self.unit_price_cents
+        if total > 2_000_000_000:
+            raise ValueError("order line total is limited to 2,000,000,000 cents")
+        if self.discount_cents > total:
             raise ValueError("discount_cents exceeds the order line total")
         return self
 

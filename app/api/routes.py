@@ -77,10 +77,10 @@ def dashboard(
     d2 = date_to or utc_today()
     d1 = date_from or (d2 - timedelta(days=29))
     if d1 > d2:
-        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "date_from is after date_to")
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "date_from is after date_to")
     if (d2 - d1).days + 1 > settings.max_range_days:
         raise HTTPException(
-            status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status.HTTP_422_UNPROCESSABLE_CONTENT,
             f"range is limited to {settings.max_range_days} days",
         )
 
@@ -173,7 +173,7 @@ def post_orders(
         )
     except UnknownSkus as e:
         session.rollback()
-        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, str(e)) from e
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(e)) from e
     session.commit()
     cache.invalidate(seller_id)  # so the next read reports `stale: true` instead of old numbers
     job_id = _enqueue(

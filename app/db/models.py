@@ -65,6 +65,11 @@ class Order(Base):
         Index("ix_orders_seller_day", "seller_id", "day"),
         CheckConstraint("status IN ('delivered', 'cancelled')", name="ck_orders_status"),
         CheckConstraint("quantity > 0", name="ck_orders_quantity"),
+        # Keeps every per-order money column inside int4 (refunds, discounts, ...). The
+        # aggregation still casts to bigint because revenue * bps is ~1e12 at this limit.
+        CheckConstraint(
+            "quantity::bigint * unit_price_cents <= 2000000000", name="ck_orders_line_total"
+        ),
     )
 
     id: Mapped[int] = mapped_column(BigInteger, Identity(always=False), primary_key=True)

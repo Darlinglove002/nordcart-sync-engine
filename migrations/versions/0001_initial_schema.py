@@ -100,6 +100,7 @@ def upgrade() -> None:
     sa.Column('day', sa.Date(), nullable=False),
     sa.CheckConstraint("status IN ('delivered', 'cancelled')", name='ck_orders_status'),
     sa.CheckConstraint('quantity > 0', name='ck_orders_quantity'),
+    sa.CheckConstraint('quantity::bigint * unit_price_cents <= 2000000000', name='ck_orders_line_total'),
     sa.ForeignKeyConstraint(['product_id'], ['products.id'], ondelete='CASCADE'),
     sa.ForeignKeyConstraint(['seller_id'], ['sellers.id'], ondelete='CASCADE'),
     sa.PrimaryKeyConstraint('id')
