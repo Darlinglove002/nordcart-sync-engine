@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import time
+from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager
 from typing import Any
 
@@ -18,7 +19,7 @@ log = logging.getLogger(__name__)
 
 
 @asynccontextmanager
-async def lifespan(_: FastAPI):
+async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     configure_logging()
     get_settings()  # fail at startup, not on the first request, if ADMIN_API_KEY is missing/weak
     log.info("started")
@@ -36,7 +37,9 @@ def create_app() -> FastAPI:
     )
 
     @app.middleware("http")
-    async def timing_and_headers(request: Request, call_next) -> Response:
+    async def timing_and_headers(
+        request: Request, call_next: Callable[[Request], Awaitable[Response]]
+    ) -> Response:
         t0 = time.perf_counter()
         response = await call_next(request)
         response.headers["X-Process-Time-Ms"] = f"{(time.perf_counter() - t0) * 1000:.2f}"

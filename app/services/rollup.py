@@ -5,9 +5,9 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 from datetime import UTC, date, datetime
-from typing import Any
+from typing import Any, cast
 
-from sqlalchemy import BigInteger, delete, func, insert, select, update
+from sqlalchemy import BigInteger, CursorResult, delete, func, insert, select, update
 from sqlalchemy.orm import Session
 
 from app.db.models import (
@@ -246,10 +246,13 @@ def recalculate(s: Session, seller_id: int, *, full: bool = False) -> RecalcResu
 
     # Compare-and-set: if an ingest bumped data_version while we were computing, leave the
     # seller dirty so the next run picks the new rows up.
-    cleared = s.execute(
-        update(Seller)
-        .where(Seller.id == seller_id, Seller.data_version == seen_version)
-        .values(dirty_since=None, last_recalculated_at=func.now())
+    cleared = cast(
+        "CursorResult[Any]",
+        s.execute(
+            update(Seller)
+            .where(Seller.id == seller_id, Seller.data_version == seen_version)
+            .values(dirty_since=None, last_recalculated_at=func.now())
+        ),
     ).rowcount
     if not cleared:
         s.execute(

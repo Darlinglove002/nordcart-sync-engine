@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import UTC, date, datetime
+from typing import Any
 
 from sqlalchemy import func, insert, select, update
 from sqlalchemy.orm import Session
@@ -36,18 +37,20 @@ def ingest_orders(s: Session, seller_id: int, orders: list[NewOrder]) -> date:
     is what makes the recalculation's compare-and-set safe.
     """
     skus = {o.sku for o in orders}
-    found = dict(
+    found: dict[str, int] = dict(
         s.execute(
             select(Product.sku, Product.id).where(
                 Product.seller_id == seller_id, Product.sku.in_(skus)
             )
-        ).all()
+        )
+        .tuples()
+        .all()
     )
     missing = skus - found.keys()
     if missing:
         raise UnknownSkus(missing)
 
-    rows = []
+    rows: list[dict[str, Any]] = []
     for o in orders:
         at = o.ordered_at.astimezone(UTC)
         rows.append(

@@ -19,7 +19,7 @@ import logging
 import time
 from collections.abc import Callable
 from functools import lru_cache
-from typing import Any
+from typing import Any, cast
 
 import redis
 from redis.exceptions import LockError, RedisError
@@ -48,7 +48,7 @@ def purge_all(client: redis.Redis) -> int:
     n = 0
     for pattern in ("ue:*", "auth:*", "lock:*"):
         for k in client.scan_iter(pattern, count=500):
-            n += client.delete(k)
+            n += cast(int, client.delete(k))
     return n
 
 
@@ -76,7 +76,7 @@ class DashboardCache:
         """Returns (payload, how) where how is 'hit', 'coalesced', 'miss' or 'bypass'."""
         try:
             key = self.key(seller_id, *parts)
-            raw = self.r.get(key)
+            raw = cast("str | None", self.r.get(key))
             if raw is not None:
                 return json.loads(raw), "hit"
 
@@ -84,7 +84,7 @@ class DashboardCache:
             if lock.acquire(blocking=False):
                 try:
                     # Someone may have filled it between our GET and taking the lock.
-                    raw = self.r.get(key)
+                    raw = cast("str | None", self.r.get(key))
                     if raw is not None:
                         return json.loads(raw), "hit"
                     payload = compute()
@@ -99,7 +99,7 @@ class DashboardCache:
             deadline = time.monotonic() + self.wait_seconds
             while time.monotonic() < deadline:
                 time.sleep(0.02)
-                raw = self.r.get(key)
+                raw = cast("str | None", self.r.get(key))
                 if raw is not None:
                     return json.loads(raw), "coalesced"
             # The leader is slow or died. Compute ourselves rather than fail the request.

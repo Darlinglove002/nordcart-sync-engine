@@ -38,7 +38,9 @@ CacheDep = Annotated[DashboardCache, Depends(get_cache)]
 SellerDep = Annotated[int, Depends(authorize_seller)]
 
 
-def _enqueue(task, *args, dedupe_key: str | None = None, dedupe_seconds: int = 30) -> str | None:
+def _enqueue(
+    task: Any, *args: Any, dedupe_key: str | None = None, dedupe_seconds: int = 30
+) -> str | None:
     """Send a task, never letting a broker outage break an API request."""
     try:
         if dedupe_key and not get_redis().set(dedupe_key, "1", nx=True, ex=dedupe_seconds):
