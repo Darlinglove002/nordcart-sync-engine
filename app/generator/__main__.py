@@ -2,9 +2,14 @@
 
 Generates the dataset, then builds the rollups in-process (no broker needed) and prints the
 per-seller API keys. The keys are shown once; only their hashes are stored.
+
+Progress goes through logging (stderr). The keys are the one thing this CLI exists to show and
+they are secrets, so they are written to stdout for the person at the terminal and never
+through logging, whose output may be shipped to a log store.
 """
 
 import argparse
+import logging
 import time
 
 from redis.exceptions import RedisError
@@ -13,7 +18,10 @@ from app.cache import DashboardCache, get_redis, purge_all
 from app.config import get_settings
 from app.db.session import get_engine, session_scope
 from app.generator.synthetic import generate, reset_all
+from app.logging_config import configure_logging
 from app.services.rollup import recalculate
+
+log = logging.getLogger(__name__)
 
 
 def main() -> None:
@@ -25,6 +33,7 @@ def main() -> None:
     p.add_argument("--reset", action="store_true", help="wipe all existing data first")
     p.add_argument("--no-recalc", action="store_true", help="skip building rollups")
     a = p.parse_args()
+    configure_logging()
 
     engine = get_engine()
     cfg = get_settings()
@@ -35,14 +44,18 @@ def main() -> None:
         try:
             purge_all(get_redis())
         except RedisError:
-            print("warning: Redis unreachable, cached dashboards will expire by TTL")
-        print("existing data wiped")
+            log.warning("Redis unreachable, cached dashboards will expire by TTL")
+        log.info("existing data wiped")
 
     t0 = time.perf_counter()
     res = generate(engine, sellers=a.sellers, orders=a.orders, days=a.days, seed=a.seed)
-    print(
-        f"generated {res.orders:,} orders, {res.returns:,} returns, {res.products:,} products, "
-        f"{res.ad_days:,} ad-spend days in {time.perf_counter() - t0:.1f}s"
+    log.info(
+        "generated %s orders, %s returns, %s products, %s ad-spend days in %.1fs",
+        f"{res.orders:,}",
+        f"{res.returns:,}",
+        f"{res.products:,}",
+        f"{res.ad_days:,}",
+        time.perf_counter() - t0,
     )
 
     if not a.no_recalc:
@@ -51,14 +64,21 @@ def main() -> None:
             with session_scope() as session:
                 r = recalculate(session, s.id, full=True)
             cache.invalidate(s.id)
-            print(
-                f"  rollup seller {s.id}: {r.days} days, {r.sku_rows:,} sku-day rows "
-                f"in {time.perf_counter() - t:.2f}s"
+            if r is None:  # cannot happen right after generate(); keeps the type honest
+                log.warning("rollup seller %s: seller not found", s.id)
+                continue
+            log.info(
+                "rollup seller %s: %d days, %s sku-day rows in %.2fs",
+                s.id,
+                r.days,
+                f"{r.sku_rows:,}",
+                time.perf_counter() - t,
             )
 
-    print("\nseller API keys (shown once):")
+    # Secrets: stdout only, never logged (see the module docstring).
+    print("\nseller API keys (shown once):")  # noqa: T201
     for s in res.sellers:
-        print(f"  seller {s.id:>3}  {s.name:<32} {s.api_key}")
+        print(f"  seller {s.id:>3}  {s.name:<32} {s.api_key}")  # noqa: T201
 
 
 if __name__ == "__main__":

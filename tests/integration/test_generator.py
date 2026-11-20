@@ -100,3 +100,29 @@ def test_appending_does_not_collide_with_existing_rows(engine):
 def test_rejects_nonsense_sizes(engine, kwargs):
     with pytest.raises(ValueError):
         generate(engine, today=TODAY, **kwargs)
+
+
+def test_cli_logs_progress_but_prints_secret_keys_only_to_stdout(
+    engine, monkeypatch, capsys, caplog
+):
+    import logging
+    import re
+    import sys
+
+    from app.generator.__main__ import main
+
+    argv = ["app.generator", "--sellers", "1", "--orders", "300", "--days", "14", "--reset"]
+    monkeypatch.setattr(sys, "argv", argv)
+    root = logging.getLogger()
+    before = root.level
+    try:
+        with caplog.at_level(logging.INFO):
+            main()
+    finally:
+        root.setLevel(before)
+
+    out = capsys.readouterr().out
+    keys = re.findall(r"^\s+seller\s+\d+\s+.*\s(\S+)$", out, re.M)
+    assert len(keys) == 1 and len(keys[0]) >= 32
+    assert "generated 300 orders" in caplog.text and "rollup seller" in caplog.text
+    assert keys[0] not in caplog.text, "an API key must never reach the log"

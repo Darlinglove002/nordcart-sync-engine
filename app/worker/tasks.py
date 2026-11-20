@@ -34,15 +34,26 @@ def recalculate_seller(seller_id: int, full: bool = False) -> dict[str, Any]:
     redis_client = get_redis()
     lock = redis_client.lock(f"lock:recalc:{seller_id}", timeout=1200, blocking=False)
     if not lock.acquire(blocking=False):
+        log.info("seller %s: recalculation already running, skipped", seller_id)
         return {"seller_id": seller_id, "status": "skipped", "reason": "already running"}
     try:
         started = time.perf_counter()
         with session_scope() as session:
             result = recalculate(session, seller_id, full=full)
         if result is None:
+            log.warning("seller %s: not found, nothing to recalculate", seller_id)
             return {"seller_id": seller_id, "status": "not_found"}
         # After the commit: a reader can never cache pre-recalculation data under the new version.
         _cache().invalidate(seller_id)
+        seconds = round(time.perf_counter() - started, 3)
+        log.info(
+            "seller %s: recalculated %d days, %d sku rows in %.2fs (full=%s)",
+            seller_id,
+            result.days,
+            result.sku_rows,
+            seconds,
+            full,
+        )
         return {
             "seller_id": seller_id,
             "status": "done",
@@ -51,7 +62,7 @@ def recalculate_seller(seller_id: int, full: bool = False) -> dict[str, Any]:
             "days": result.days,
             "sku_rows": result.sku_rows,
             "cleared_dirty": result.cleared_dirty,
-            "seconds": round(time.perf_counter() - started, 3),
+            "seconds": seconds,
         }
     finally:
         try:
@@ -69,6 +80,8 @@ def recalculate_dirty() -> dict[str, Any]:
         )
     for sid in ids:
         recalculate_seller.delay(sid)
+    # The sweep runs every minute: log only when it found something to do.
+    log.log(logging.INFO if ids else logging.DEBUG, "sweep: queued %d dirty sellers", len(ids))
     return {"queued": ids}
 
 
@@ -83,6 +96,12 @@ def generate_dataset(sellers: int, orders: int, days: int, seed: int) -> dict[st
     res = generate(get_engine(), sellers=sellers, orders=orders, days=days, seed=seed)
     for s in res.sellers:
         recalculate_seller.delay(s.id, True)
+    log.info(
+        "generated %d orders for %d sellers in %.1fs",
+        res.orders,
+        len(res.sellers),
+        time.perf_counter() - started,
+    )
     return {
         "seller_ids": [s.id for s in res.sellers],
         "orders": res.orders,
