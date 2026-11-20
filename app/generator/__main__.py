@@ -21,7 +21,7 @@ from app.generator.synthetic import generate, reset_all
 from app.logging_config import configure_logging
 from app.services.rollup import recalculate
 
-log = logging.getLogger(__name__)
+log = logging.getLogger("app.generator")  # __name__ would be "__main__" under `python -m`
 
 
 def main() -> None:
