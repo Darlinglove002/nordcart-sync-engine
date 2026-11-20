@@ -11,7 +11,7 @@ import hashlib
 import hmac
 import logging
 from dataclasses import dataclass
-from typing import Annotated
+from typing import Annotated, cast
 
 from fastapi import Depends, Header, HTTPException, status
 from redis.exceptions import RedisError
@@ -57,7 +57,7 @@ def _seller_for_key(key_hash: str, session: Session) -> int | None:
     try:
         hit = r.get(auth_cache_key(key_hash))
         if hit is not None:
-            return int(hit)
+            return int(cast(str, hit))
     except RedisError:
         log.warning("redis unavailable for auth lookup; using the database")
 

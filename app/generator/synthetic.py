@@ -20,6 +20,7 @@ import secrets
 from bisect import bisect_left
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, timedelta
+from typing import Any, cast
 
 from sqlalchemy import Engine, insert, text
 
@@ -106,7 +107,7 @@ def generate(
             ).scalar_one()
             created.append(GeneratedSeller(sid, name, key))
 
-            specs = []
+            specs: list[dict[str, Any]] = []
             for n in range(products_per_seller):
                 cat = rng.choice(list(CATEGORIES))
                 commission, (plo, phi), (mlo, mhi), _, _ = CATEGORIES[cat]
@@ -144,7 +145,7 @@ def generate(
     revenue_by_day: dict[tuple[int, date], int] = {}
     returns_buf: list[tuple] = []
     try:
-        with raw.cursor() as cur:
+        with cast("Any", raw.cursor()) as cur:  # the DBAPI cursor protocol has no context manager
             cur.execute("SELECT coalesce(max(id), 0) FROM orders")
             order_id = cur.fetchone()[0]
             cur.execute("SELECT coalesce(max(id), 0) FROM returns")

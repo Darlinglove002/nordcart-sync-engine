@@ -38,7 +38,9 @@ CacheDep = Annotated[DashboardCache, Depends(get_cache)]
 SellerDep = Annotated[int, Depends(authorize_seller)]
 
 
-def _enqueue(task, *args, dedupe_key: str | None = None, dedupe_seconds: int = 30) -> str | None:
+def _enqueue(
+    task: Any, *args: Any, dedupe_key: str | None = None, dedupe_seconds: int = 30
+) -> str | None:
     """Send a task, never letting a broker outage break an API request."""
     try:
         if dedupe_key and not get_redis().set(dedupe_key, "1", nx=True, ex=dedupe_seconds):
@@ -176,6 +178,12 @@ def post_orders(
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(e)) from e
     session.commit()
     cache.invalidate(seller_id)  # so the next read reports `stale: true` instead of old numbers
+    log.info(
+        "seller %s: %d orders accepted, earliest day %s",
+        seller_id,
+        len(body.orders),
+        earliest.isoformat(),
+    )
     job_id = _enqueue(
         recalculate_seller, seller_id, False, dedupe_key=f"ue:enq:{seller_id}", dedupe_seconds=5
     )
@@ -190,6 +198,13 @@ def seed(body: SeedIn, _admin: Annotated[Principal, Depends(require_admin)]) -> 
     job_id = _enqueue(generate_dataset, body.sellers, body.orders, body.days, body.seed)
     if job_id is None:
         raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "job queue unavailable")
+    log.info(
+        "seed job %s queued: %d sellers, %d orders, %d days",
+        job_id,
+        body.sellers,
+        body.orders,
+        body.days,
+    )
     return JobAccepted(job_id=job_id, status_url=f"/api/v1/admin/jobs/{job_id}")
 
 
@@ -225,4 +240,5 @@ def rotate_key(
         get_redis().delete(auth_cache_key(old))
     except RedisError:
         log.warning("could not drop cached auth entry for seller %s", seller_id)
+    log.info("seller %s: API key rotated", seller_id)  # the key itself is never logged
     return {"seller_id": seller_id, "api_key": new_key}
