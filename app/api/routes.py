@@ -190,9 +190,6 @@ def post_orders(
     return {"accepted": len(body.orders), "earliest_day": earliest.isoformat(), "job_id": job_id}
 
 
-# --------------------------------------------------------------------------------- admin
-
-
 @router.post("/admin/seed", status_code=status.HTTP_202_ACCEPTED)
 def seed(body: SeedIn, _admin: Annotated[Principal, Depends(require_admin)]) -> JobAccepted:
     job_id = _enqueue(generate_dataset, body.sellers, body.orders, body.days, body.seed)
